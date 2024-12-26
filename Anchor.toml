@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-rusted_dex = "5sRS7S7T8CR4LfeqHYJSBw1smKoeNmEEM3XLP1jhcLGZ"
+rusted_dex = "3ExuW6YgGZS6Bf7vKfwbQ4bZbTDUYEkjnG3Xfrebhu8s"
 
 [registry]
 url = "https://api.apr.dev"
