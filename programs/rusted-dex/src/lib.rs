@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
-declare_id!("4wsTATxTyvcSQKAFEBJN3gEYnP3H2PcBNnX8CEyEYkrV");
+declare_id!("3ExuW6YgGZS6Bf7vKfwbQ4bZbTDUYEkjnG3Xfrebhu8s");
 
 const DISCRIMINATOR_SIZE: usize = 8;
 
