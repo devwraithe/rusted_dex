@@ -1,55 +1,42 @@
+use crate::test_utils::setup_pool_addresses;
 use anchor_client::{
-    solana_sdk::{
-        commitment_config::CommitmentConfig,
-        pubkey::Pubkey,
-        signature::{read_keypair_file, Keypair},
-        signer::Signer,
-        system_program,
-    },
-    Client, Cluster,
+    solana_sdk::{pubkey::Pubkey, signer::Signer, system_program},
+    Program,
 };
 use rusted_dex::{accounts, instruction};
-use std::{error::Error, str::FromStr};
+use solana_sdk::signature::{Keypair, Signature};
+use std::error::Error;
 
 #[test]
-fn test_initialize_pool() -> Result<(), Box<dyn Error>> {
-    // Retrieve anchor wallet from env variable
-    let anchor_wallet =
-        std::env::var("ANCHOR_WALLET").expect("Environment variable ANCHOR WALLET is not set");
+pub fn initialize_pool() -> Result<(), Box<dyn Error>> {
+    let (pool_addr, token_a, token_b, payer, program) = setup_pool_addresses();
 
-    // Read the keypair for payer from file
-    let payer = read_keypair_file(&anchor_wallet).expect("Failed to read keypair file");
+    let tx = initialize_program(pool_addr, token_a, token_b, payer, &program)
+        .map_err(|e| format!("❌initialize pool failed: {}", e))?;
 
-    // Initialize client with explicit commitment
-    let client = Client::new_with_options(Cluster::Localnet, &payer, CommitmentConfig::confirmed());
+    println!("✅initialize pool successful: {}", tx);
+    println!("https://explorer.solana.com/tx/{}?cluster=devnet", tx);
 
-    // Create program with program id from constants
-    let program_id = rusted_dex::ID;
-    let program = client
-        .program(program_id)
-        .expect("Failed to initialize program client");
+    Ok(())
+}
 
-    // Create new keypair for the order
-    let pool = Keypair::new();
-    let token_a_str = "6WWRQ5vU17nQaDWeU7QCV4htfWzFwhmoDzADsHdKczVP";
-    let token_b_str = "FjrLKrEQ95QonQjbE2yoZnKPXQi1X4YayK6BBurWN73H";
-    let token_a = Pubkey::from_str(token_a_str).unwrap();
-    let token_b = Pubkey::from_str(token_b_str).unwrap();
-
-    // Build and send transaction
-    let tx = program
+pub fn initialize_program(
+    pool_addr: Pubkey,
+    token_a: Pubkey,
+    token_b: Pubkey,
+    payer: &'static Keypair,
+    program: &Program<&'static Keypair>,
+) -> Result<Signature, Box<dyn Error>> {
+    let init_tx = program
         .request()
         .accounts(accounts::InitializePool {
-            pool: pool.pubkey(),
+            pool: pool_addr,
             user: payer.pubkey(),
             system_program: system_program::ID,
         })
         .args(instruction::InitializePool { token_a, token_b })
-        .signer(&pool)
-        .send()
-        .map_err(|e| format!("Transaction failed: {}", e))?;
+        .signer(&payer)
+        .send()?;
 
-    println!("Transaction successful. Signature: {}", tx);
-
-    Ok(())
+    Ok(init_tx)
 }
