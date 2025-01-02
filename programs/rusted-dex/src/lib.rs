@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
-declare_id!("3ExuW6YgGZS6Bf7vKfwbQ4bZbTDUYEkjnG3Xfrebhu8s");
+declare_id!("5g41rWoDcyNQm8TR2zpbfTH3P2ZyVTfBjeQ4Rk3cN2az");
 
 const DISCRIMINATOR_SIZE: usize = 8;
 
@@ -89,9 +89,6 @@ pub mod rusted_dex {
         };
 
         let _ = token::mint_to(trf_mint, lp_tokens_to_mint)?;
-
-        let balance = ctx.accounts.pool.to_account_info().lamports();
-        msg!("balance in lamports after adding liquidity is {}", balance);
 
         Ok(())
     }
