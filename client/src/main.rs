@@ -1,7 +1,9 @@
 use anchor_client::{Client, Cluster};
+use anchor_spl::token::{spl_token, Mint};
 use clap::{Parser, Subcommand};
 use rusted_dex::{accounts, instruction};
 use solana_sdk::{
+    program_pack::Pack,
     pubkey::Pubkey,
     signature::Keypair,
     signer::{EncodableKey, Signer},
@@ -19,7 +21,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    InitializePool,
+    RustedDex,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -32,7 +34,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?);
     let payer = Rc::new(Keypair::new());
     let client = Client::new(cluster, payer.clone());
-    add_sol(&client, &supplier, &payer.pubkey())?;
 
     // create program
     let program = client.program(rusted_dex::ID)?;
@@ -42,11 +43,178 @@ fn main() -> Result<(), Box<dyn Error>> {
     let token_a = Pubkey::new_unique();
     let token_b = Pubkey::new_unique();
 
-    match &cli.command {
-        Commands::InitializePool => {
-            println!("initializing the pool...");
+    // mint account keypairs
+    let token_a_mint = Keypair::new();
+    let token_b_mint = Keypair::new();
+    let lp_token_mint = Keypair::new();
 
+    // user account keypairs
+    let user_token_a = Keypair::new();
+    let user_token_b = Keypair::new();
+    let user_lp_token = Keypair::new();
+
+    // pool account keypairs
+    let pool_token_a = Keypair::new();
+    let pool_token_b = Keypair::new();
+
+    // rent balances
+    let rpc_client = program.rpc();
+    let mint_rent = rpc_client.get_minimum_balance_for_rent_exemption(Mint::LEN)?;
+    let account_rent =
+        rpc_client.get_minimum_balance_for_rent_exemption(spl_token::state::Account::LEN)?;
+
+    // create mint accounts
+    let create_mint_a = system_instruction::create_account(
+        &payer.pubkey(),
+        &token_a_mint.pubkey(),
+        mint_rent,
+        Mint::LEN as u64,
+        &spl_token::ID,
+    );
+
+    let create_mint_b = system_instruction::create_account(
+        &payer.pubkey(),
+        &token_b_mint.pubkey(),
+        mint_rent,
+        Mint::LEN as u64,
+        &spl_token::ID,
+    );
+
+    let create_mint_lp_token = system_instruction::create_account(
+        &payer.pubkey(),
+        &lp_token_mint.pubkey(),
+        mint_rent,
+        Mint::LEN as u64,
+        &spl_token::ID,
+    );
+
+    // initialize mint accounts
+    let init_mint_a = spl_token::instruction::initialize_mint(
+        &spl_token::ID,
+        &token_a_mint.pubkey(),
+        &payer.pubkey(),
+        None,
+        6,
+    );
+
+    let init_mint_b = spl_token::instruction::initialize_mint(
+        &spl_token::ID,
+        &token_b_mint.pubkey(),
+        &payer.pubkey(),
+        None,
+        6,
+    );
+
+    let init_mint_lp_token = spl_token::instruction::initialize_mint(
+        &spl_token::ID,
+        &lp_token_mint.pubkey(),
+        &payer.pubkey(),
+        None,
+        6,
+    );
+
+    // create token accounts
+    let create_user_token_a = system_instruction::create_account(
+        &payer.pubkey(),
+        &user_token_a.pubkey(),
+        account_rent,
+        spl_token::state::Account::LEN as u64,
+        &spl_token::ID,
+    );
+
+    let create_user_token_b = system_instruction::create_account(
+        &payer.pubkey(),
+        &user_token_b.pubkey(),
+        account_rent,
+        spl_token::state::Account::LEN as u64,
+        &spl_token::ID,
+    );
+
+    let create_user_lp_token = system_instruction::create_account(
+        &payer.pubkey(),
+        &user_lp_token.pubkey(),
+        account_rent,
+        spl_token::state::Account::LEN as u64,
+        &spl_token::ID,
+    );
+
+    // create pool accounts
+    let create_pool_token_a = system_instruction::create_account(
+        &payer.pubkey(),
+        &pool_token_a.pubkey(),
+        account_rent,
+        spl_token::state::Account::LEN as u64,
+        &spl_token::ID,
+    );
+
+    let create_pool_token_b = system_instruction::create_account(
+        &payer.pubkey(),
+        &pool_token_b.pubkey(),
+        account_rent,
+        spl_token::state::Account::LEN as u64,
+        &spl_token::ID,
+    );
+
+    // initialize token accounts
+    let init_user_token_a = spl_token::instruction::initialize_account(
+        &spl_token::ID,
+        &user_token_a.pubkey(),
+        &token_a_mint.pubkey(),
+        &payer.pubkey(),
+    );
+
+    let init_user_token_b = spl_token::instruction::initialize_account(
+        &spl_token::ID,
+        &user_token_b.pubkey(),
+        &token_b_mint.pubkey(),
+        &payer.pubkey(),
+    );
+
+    let init_user_lp_token = spl_token::instruction::initialize_account(
+        &spl_token::ID,
+        &user_lp_token.pubkey(),
+        &lp_token_mint.pubkey(),
+        &payer.pubkey(),
+    );
+
+    let init_pool_token_a = spl_token::instruction::initialize_account(
+        &spl_token::ID,
+        &pool_token_a.pubkey(),
+        &token_a_mint.pubkey(),
+        &payer.pubkey(),
+    );
+
+    let init_pool_token_b = spl_token::instruction::initialize_account(
+        &spl_token::ID,
+        &pool_token_b.pubkey(),
+        &token_b_mint.pubkey(),
+        &payer.pubkey(),
+    );
+
+    // mint initial tokens to accounts
+    let mint_to_user_a = spl_token::instruction::mint_to(
+        &spl_token::ID,
+        &token_a_mint.pubkey(),
+        &user_token_a.pubkey(),
+        &payer.pubkey(),
+        &[&payer.pubkey()],
+        10_000,
+    );
+
+    let mint_to_user_b = spl_token::instruction::mint_to(
+        &spl_token::ID,
+        &token_b_mint.pubkey(),
+        &user_token_b.pubkey(),
+        &payer.pubkey(),
+        &[&payer.pubkey()],
+        10_000,
+    );
+
+    match &cli.command {
+        Commands::RustedDex => {
             // initialize pool
+            println!("initializing the pool...");
+            add_sol(&client, &supplier, &payer.pubkey())?;
             let init_tx = program
                 .request()
                 .accounts(accounts::InitializePool {
@@ -61,7 +229,74 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("✅initialize pool successful");
 
             let tx_url = format!("https://explorer.solana.com/tx/{}?cluster=devnet", init_tx);
-            println!("🔗init pool url: {}", tx_url);
+            println!("🔗initialize pool url: {}", tx_url);
+
+            // add liquidity
+            println!("adding liquidity to the pool...");
+            program
+                .request()
+                .instruction(create_mint_a)
+                .instruction(init_mint_a?)
+                .instruction(create_mint_b)
+                .instruction(init_mint_b?)
+                .instruction(create_mint_lp_token)
+                .instruction(init_mint_lp_token?)
+                .signer(&token_a_mint)
+                .signer(&token_b_mint)
+                .signer(&lp_token_mint)
+                .send()
+                .map_err(|e| format!("mint accounts creation failed: {}", e))?;
+
+            program
+                .request()
+                .instruction(create_user_token_a)
+                .instruction(init_user_token_a?)
+                .instruction(create_user_token_b)
+                .instruction(init_user_token_b?)
+                .instruction(create_user_lp_token)
+                .instruction(init_user_lp_token?)
+                .signer(&user_token_a)
+                .signer(&user_token_b)
+                .signer(&user_lp_token)
+                .send()?;
+
+            program
+                .request()
+                .instruction(create_pool_token_a)
+                .instruction(init_pool_token_a?)
+                .instruction(create_pool_token_b)
+                .instruction(init_pool_token_b?)
+                .instruction(mint_to_user_a?)
+                .instruction(mint_to_user_b?)
+                .signer(&pool_token_a)
+                .signer(&pool_token_b)
+                .send()?;
+
+            let add_tx = program
+                .request()
+                .accounts(accounts::AddLiquidity {
+                    pool: pool_addr,
+                    user: payer.pubkey(),
+                    user_token_a: user_token_a.pubkey(),
+                    user_token_b: user_token_b.pubkey(),
+                    pool_token_a: pool_token_a.pubkey(),
+                    pool_token_b: pool_token_b.pubkey(),
+                    lp_token_mint: lp_token_mint.pubkey(),
+                    user_lp_token: user_lp_token.pubkey(),
+                    token_program: spl_token::ID,
+                })
+                .args(instruction::AddLiquidity {
+                    amount_a: 1000,
+                    amount_b: 1000,
+                })
+                .signer(&payer)
+                .send()
+                .map_err(|e| format!("❌add liquidity failed: {}", e))?;
+
+            println!("✅add liquidity successful");
+
+            let tx_url = format!("https://explorer.solana.com/tx/{}?cluster=devnet", add_tx);
+            println!("🔗add liquidity url: {}", tx_url);
         }
     }
 
@@ -74,10 +309,10 @@ fn add_sol(
     recipient: &Pubkey,
 ) -> Result<(), Box<dyn Error>> {
     let one_sol = 1_000_000_000.0;
-    let amount = 100_000_000;
+    let amount = 30_000_000;
 
     println!(
-        "transferring {} SOL to {}...",
+        "transferring {} sol to {}...",
         amount as f64 / one_sol,
         recipient
     );
@@ -106,17 +341,17 @@ fn add_sol(
     let recipient_balance = program.rpc().get_balance(recipient)?;
 
     println!(
-        "✅transferred {} SOL from {} to {}",
+        "✅transferred {} sol from {} to {}",
         amount as f64 / one_sol,
         sender.pubkey(),
         recipient
     );
     println!(
-        "sender's balance: {} lamports",
+        "sender's balance: {} sol",
         sender_balance as f64 / one_sol
     );
     println!(
-        "recipient's balance: {} lamports",
+        "recipient's balance: {} sol",
         recipient_balance as f64 / one_sol
     );
 
@@ -124,7 +359,7 @@ fn add_sol(
         "https://explorer.solana.com/tx/{}?cluster=devnet",
         signature,
     );
-    println!("🔗tx sol url: {}", tx_url);
+    println!("🔗add sol url: {}", tx_url);
 
     Ok(())
 }
