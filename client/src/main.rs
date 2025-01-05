@@ -1,7 +1,7 @@
 use anchor_client::{Client, Cluster};
 use anchor_spl::token::{spl_token, Mint};
 use clap::{Parser, Subcommand};
-use rusted_dex::{accounts, instruction};
+use rusted_dex::{accounts, instruction, SwapTokenParams};
 use solana_sdk::{
     program_pack::Pack,
     pubkey::Pubkey,
@@ -297,6 +297,39 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let tx_url = format!("https://explorer.solana.com/tx/{}?cluster=devnet", add_tx);
             println!("🔗add liquidity url: {}", tx_url);
+
+            // swap token
+            println!("swapping tokens...");
+
+            let amount_in = 1000;
+            let minimum_output_amount = 450; // slippage protection
+            let swap_params = SwapTokenParams {
+                amount_in,
+                minimum_output_amount,
+            };
+
+            let swap_tx = program
+                .request()
+                .accounts(accounts::SwapToken {
+                    pool: pool_addr,
+                    user: payer.pubkey(),
+                    user_input_token_account: user_token_a.pubkey(),
+                    user_output_token_account: user_token_b.pubkey(),
+                    pool_input_token_account: pool_token_a.pubkey(),
+                    pool_output_token_account: pool_token_b.pubkey(),
+                    token_program: spl_token::ID,
+                })
+                .args(instruction::SwapToken {
+                    params: swap_params,
+                })
+                .signer(&payer)
+                .send()
+                .map_err(|e| format!("❌swap token failed: {}", e))?;
+
+            println!("✅swap token successful");
+
+            let tx_url = format!("https://explorer.solana.com/tx/{}?cluster=devnet", swap_tx);
+            println!("🔗swap token url: {}", tx_url);
         }
     }
 
@@ -346,10 +379,7 @@ fn add_sol(
         sender.pubkey(),
         recipient
     );
-    println!(
-        "sender's balance: {} sol",
-        sender_balance as f64 / one_sol
-    );
+    println!("sender's balance: {} sol", sender_balance as f64 / one_sol);
     println!(
         "recipient's balance: {} sol",
         recipient_balance as f64 / one_sol
