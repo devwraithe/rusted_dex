@@ -1,7 +1,9 @@
 [workspace]
 members = [
-    "programs/*"
-, "tests"]
+    "client",
+    "programs/*",
+    "tests"
+]
 resolver = "2"
 
 [profile.release]
